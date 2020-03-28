@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-3"></div>
+        <div class="col-md-6" style="color:#3288bd;font-size:12pt;">
+            Use mouse button down to spin surface, mouse wheel to zoom
+        </div>
+        <div class="col-md-3"></div>
+    </div>
+    <div class="row">
+
+        <div class="col-xs-1">
+            <svg></svg>
+        </div>
+        <div class="col-xs-10" id="container">
+        </div>
+        <div class="col-xs-1">
+            <row>
+                <div id="dgui"></div>
+            </row>
+        </div>
+
+    </div>
+
+
+</div>
+
+<style type="text/css">
+
+    #dgui {
+        position: -webkit-sticky;
+        position: sticky;
+        top: 49px;
+        left: 0;
+        padding-top: 5px;
+        height: 100px;
+    }
+
+    body {
+        background-color: white;
+    }
+
+    svg {
+        height: 350px;
+        width: 120px;
+        position: -webkit-sticky;
+        position: sticky;
+        top: 349px;
+        padding-top: 5px;
+    }
+
+    .label {
+        color: #00F;
+        font-family: sans-serif;
+        padding: 2px;
+        background: rgba( 0, 0, 0, .6 );
+    }
+
+    .top30 {
+        padding-top: 30px;
+    }
+</style>
+
+<link href="~/Scripts/dat.gui.css" rel="stylesheet" />
+<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+<script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+<script src="~/Scripts/jquery-1.10.2.min.js"></script>
+<script src="https://threejs.org/build/three.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+<script src="~/Scripts/TrackballControls.js"></script>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/2.13.0/d3-legend.js"></script>
+<script src=" ~/Scripts/PolarGridHelper.js"></script>"
+<script src="~/Scripts/colorbrewer.min.js"></script>
+<script src="~/Scripts/ParametricGeometry.js"></script>
+<script src="~/Scripts/dat.gui.js"></script>
+<script src="~/Scripts/CSS2DRenderer.js"></script>
+<script src="~/Scripts/EdgesGeometry.js"></script>
+<script src="~/Scripts/DragControls.js"></script>
+<script>
+
+    var n = 201, m = 201;
+    var input_values;
+    var xgrid = new Array(n * m);
+    var ygrid = new Array(n * m);
+    var values = new Array(n * m);
+    var zvaluesPatient;
+
+    var camera, renderer, controls, scene, color, labelRenderer;
+    var ucurves, vcurves, radiuscurve;
+    var control_obj, local_plane, rotate_flag;
+    var hov_surfaces = [];  // build and store surfaces here
+    var hov_lambert_material, hov_phong_material;
+    var axesHelper;
+    var polarhelper;
+    var titleX, titleX1, titleX2, titleX3;
+    var light_factor = 1.4;
+    var zoomFlag = false;
+    var lblGroup;
+    var overlayPlane;
+
+    
+    // initial scattered data - control points - these points should lie directly on rendered surface
+    var xvals = new Array(7.1, -7.1, -7.1, 7.1, 0, 17.7, -17.7, -17.7, 17.7, 13.9, -13.9, 2, 0, -2, -4, -2, 0, 2, 4, 5.8, 2.8, -2.8, -5.8, -5.8, -2.8, 2.8, 5.8, 9.7, 2.6, -2.6, -9.7, -9.7, -2.6, 2.6, 9.7, 14.5, 12.3, 8.6, 2.7, -2.7, -8.6, -12.3, -14.5, -14.5, -11.5, -7.6, -2.7, 2.7, 7.6, 11.5, 14.5, 19.8, 17.3, 10, 2.6, -2.6, -10, -17.3, -19.8, -19.8, -17.3, -10, -2.6, 2.6, 10, 17.3, 19.8, 24.1, 6.5, -6.5, -24.1, -24.1, -6.5, 6.5, 24.1, 28.8, 25.1, 14.5, 3, -3, -14.5, -25.1, -28.8, -28.8, -25.1, -14.5, -3, 3, 14.5, 25.1, 28.8, 0, 35.6, 44.9, 54.8, 63.7, 79, 32.1, 42.8, 49.5, 54.2, 71.3, 25.5, 36.4, 39.2, 39.4, 54.4, 16.3, 26.5, 25.2, 5.6, 13.9, 8.7, 3, -5.6, -3, -8.7, -16.3, -13.9, -25.2, -25.5, -26.5, -39.2, -32.1, -36.4, -49.5, -35.6, -42.8, -54.8, -44.9, -35.6, -44.9, -54.8, -32.1, -42.8, -49.5, -25.5, -36.4, -39.2, -16.3, -26.5, -25.2, -20.7, -5.6, -13.9, -3, -8.6, 0, 5.6, 3, 8.7, 20.7, 16.3, 13.9, 25.2, 39.4, 35, 25.5, 26.5, 39.2, 54.2, 56.6, 32.1, 36.4, 49.5, 63.7, 71.3, 35.6, 42.8, 44.9, 54.8, 67, 79);
+    var yvals = new Array(7.1, 7.1, -7.1, -7.1, 0, 17.7, 17.7, -17.7, -17.7, -1.2, -1.2, 2, 4, 2, 0, -2, -4, -2, 0, 2.8, 5.8, 5.8, 2.8, -2.8, -5.8, -5.8, -2.8, 2.6, 9.7, 9.7, 2.6, -2.6, -9.7, -9.7, -2.6, 3.9, 8.6, 12.9, 14.7, 14.7, 12.9, 8.6, 3.9, -6, -9.7, -12.5, -14.7, -14.7, -12.5, -9.7, -6, 2.6, 10, 17.3, 19.8, 19.8, 17.3, 10, 2.6, -2.6, -10, -17.3, -19.8, -19.8, -17.3, -10, -2.6, 6.5, 24.1, 24.1, 6.5, -6.5, -24.1, -24.1, -6.5, 3, 14.5, 25.1, 28.8, 28.8, 25.1, 14.5, 3, -3, -14.5, -25.1, -28.8, -28.8, -25.1, -14.5, -3, 0, 5.6, 3, 8.7, 20.7, 12.5, 16.3, 13.9, 25.2, 39.4, 36.3, 25.5, 26.5, 39.2, 54.2, 54.4, 32.1, 36.4, 49.5, 35.6, 42.8, 54.8, 44.9, 35.6, 44.9, 54.8, 32.1, 42.8, 49.5, 25.5, 36.4, 39.2, 16.3, 26.5, 25.2, 5.6, 13.9, 8.7, 3, -5.6, -3, -8.7, -16.3, -13.9, -25.2, -25.5, -26.5, -39.2, -32.1, -36.4, -49.5, -63.7, -35.6, -42.8, -44.9, -54.8, -67, -35.6, -44.9, -54.8, -63.7, -32.1, -42.8, -49.5, -54.2, -68.6, -25.5, -36.4, -39.2, -39.4, -56.6, -16.3, -26.5, -25.2, -20.7, -36.3, -5.6, -13.9, -3, -8.7, 0, -12.5);
+    var zvals = new Array(29.2, 25.3, 31.7, 27.7, 27.2, 15.3, 23.6, 27.6, 25.6, 29.1, 31, 25.8, 26.8, 26.9, 28.1, 26.4, 31.4, 27.9, 25.1, 26.2, 21.9, 22.3, 22.3, 30, 28.2, 31.4, 30.6, 29.7, 14.3, 24.2, 26.5, 28.9, 20.9, 6.6, 34.6, 24.6, 29.3, 28.4, 29.7, 25.1, 23.3, 27.6, 27.2, 29.6, 30, 23.5, 19.2, 0, 14.6, 30.3, 30.1, 28.9, 28.8, 20.5, 5.9, 0, 25.9, 31.3, 22.2, 25.1, 24.3, 25.9, 27.6, 24.9, 22.6, 30.5, 31.9, 31.5, 0, 0, 5.7, 24.9, 25.4, 23.1, 28.1, 30.8, 27.5, 0, 0, 0, 4.8, 25.4, 23.6, 27.9, 27.3, 28.2, 28.1, 27.5, 21.9, 28.8, 29.3, 26.4, 29.3, 29.3, 26.8, 19.8, 28, 29.4, 28.3, 21.3, 0, 0, 18.2, 28.3, 0, 0, 0, 0, 4.3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10.5, 0, 0, 21.9, 0, 0, 25.2, 12.5, 13.2, 25, 22.4, 23.5, 18, 24.6, 25.7, 0, 28.2, 26.9, 0, 25.4, 17.9, 3.1, 0, 24.3, 22.6, 19.5, 10.8, 0, 25.4, 26.1, 20.7, 23.1, 24.3, 24.6, 17.4, 21.8, 19.9, 21.9, 26.7, 19.8, 26.3, 21.6, 28.3, 25.4, 25.5, 26.7, 21.9, 26.1, 29.3, 25.5, 28.3, 27.9, 26.4);
+      
+
+    var xmin = 0.0;
+    var xmax = 0.0;
+    var ymin = 0.0;
+    var ymax = 0.0;
+    var zmin = 0.0;
+    var zmax = 0.0;
+
+     // domains for x and y grids
+    var xDomain = new Array();
+    var yDomain = new Array();
+
+
+    // container for surface and control points
+    var parent = new THREE.Group();  
+
+    // Initialize threejs scene
+    scene = new THREE.Scene();
+
+    $(function () {
+        
+      
+        // get the mins. maxs, mids of input data
+        
+        xmin = d3.min(xvals);
+        xmax = d3.max(xvals);
+        xmid = 0.5 * (xmin + xmax);
+         
+        ymin = d3.min(yvals);
+        ymax = d3.max(yvals);
+        ymid = 0.5 * (ymin + ymax);
+
+        zmin = d3.min(zvals);
+        zmax = d3.max(zvals);
+        zmid = 0.5 * (zmin + zmax);
+
+      
+        // get the interpolated data from server
+        $.ajax({
+            type: 'POST',
+            url: 'ReadHOV',
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            success: function (data) {
+                
+                buildScene();
+                createAGrid();  // plane grid gets added to Parent
+                buildSurfaces(data); // rendered surface gets added to Parent
+                //buildSplines();
+                buildCP(data); // points get added to Parent
+
+                scene.add(parent);
+                                            
+               renderer.render(scene, camera);
+               animate();
+
+            } // end success
+
+        }); // end ajax
+
+    });   // end init
+
+         
+
+
+    function buildScene() {
+        
+        // Color legend
+        var svg = d3.select("svg");
+        var colorScale = d3.scaleQuantize()
+          .domain([zmin,zmax])
+          .range(colorbrewer.Spectral[9]);
+        var colorLegend = d3.legendColor()
+          .labelFormat(d3.format(".2f"))
+          .scale(colorScale)
+          .shapePadding(10)
+          .shapeWidth(20)
+          .shapeHeight(20)
+          .labelOffset(10);
+        svg.append("g")
+            .call(colorLegend);
+               
+        // Define the perspective camera
+        camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1200);
+        camera.position.z = 250;
+        camera.position.x = 25;
+        camera.position.y = -250;
+        camera.lookAt(scene.position);
+
+        // Create renderer
+        renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(800, 800);
+        renderer.setClearColor("white");
+        
+        // enable clipping
+        Empty = Object.freeze([]);
+        renderer.clippingPlanes = Empty;
+        renderer.localClippingEnabled = true;
+
+        // Set target DIV for rendering
+        var container = document.getElementById('container');
+        container.appendChild(renderer.domElement);
+        
+        // Lights
+        // Light above
+        var light = new THREE.PointLight(0xffffff);
+        light.position.set(0, 0, 150);
+        light.name = 'light_above';
+        scene.add(light);
+
+        // Light below
+        var light = new THREE.PointLight(0xffffff);
+        light.position.set(0, 0, -150);
+        light.name = 'light_below';
+        scene.add(light);
+
+        // Ambient light
+        var light = new THREE.AmbientLight(0x222222);
+        light.name = 'light_ambient';
+        scene.add(light);
+
+        // clipping plane
+        local_plane = new THREE.Plane(new THREE.Vector3(0, 0, 1),25);
+
+        // axes helper
+        axesHelper = new THREE.AxesHelper(50);
+        scene.add(axesHelper);
+
+        // polar grid helper
+        var radius = 90;
+        var radials = 24;
+        var circles = 6;
+        var divisions = 64;
+        polarhelper = new THREE.PolarGridHelper(radius, radials, circles, divisions);
+        polarhelper.position.set(0, 0, -10);
+        polarhelper.rotation.x = Math.PI / 2;
+
+
+        var text = document.createElement('div');
+        text.className = 'label';
+        text.style.color = "rgba(0, 0, 0, 5.0)";
+        text.textContent = '180';
+        var label = new THREE.CSS2DObject(text);
+        label.position = new THREE.Vector3(-200, -200, 0);
+        polarhelper.add(label);
+        camera.updateMatrixWorld();
+
+        //scene.add(polarhelper);
+        
+        // trackball controls
+        controls = new THREE.TrackballControls(camera, container);
+        controls.rotateSpeed = 3.0;
+        controls.zoomSpeed = 1.2;
+        controls.panSpeed = 0.8;
+        controls.noZoom = false;
+        controls.noPan = false;
+        controls.staticMoving = true;
+        controls.dynamicDampingFactor = 0.3;
+        controls.keys = [65, 83, 68];
+        controls.addEventListener('change', render);
+
+    }  // end buildScene
+
+    // render control points
+    function buildCP(data) {
+          
+        var ptGroup = new THREE.Group;
+       
+        // render the control points
+        
+        for (i = 0; i < zvals.length; i++) {
+            geom = new THREE.SphereGeometry(1, 20, 20, 0, Math.PI * 2, 0, Math.PI * 2);
+            mat = new THREE.MeshBasicMaterial;
+            mat.color.setHex( Math.random() * 0x000000 );
+
+            pt = new THREE.Mesh(geom, mat);
+            ptGroup.add(pt);
+                      
+            pt.position.x = xvals[i]; //(((xvals[i] - xmin) * (61.7 - (-61.7)) / (xmax - xmin)) + (-61.7));
+            pt.position.y = yvals[i] ;// (((yvals[i] - ymin) * (66.9 - (-66.9)) / (ymax - ymin)) + (-66.9));
+            pt.position.z = (zvals[i]);
+            console.log(i + ":  " + pt.position.x + "," + pt.position.y + "," + pt.position.z)     
+        }
+        //ptGroup.rotateZ(Math.PI);
+        parent.add(ptGroup);
+
+    }
+
+    // javascript version of numpy.linspace
+
+    function linspace(a,b,n) {
+        if(typeof n === "undefined") n = Math.max(Math.round(b-a)+1,1);
+        if(n<2) { return n===1?[a]:[]; }
+        var i,ret = Array(n);
+        n--;
+        for(i=n;i>=0;i--) { ret[i] = (i*b+(n-i)*a)/n; }
+        return ret;
+    }
+
+
+    function buildSurfaces(data) {
+                
+        xDomain = linspace(xmin, xmax, 201);  //  creates 201 evenly-spaced x vals from xmin to xmax
+        yDomain = linspace(ymin, ymax, 201);  // creates 201 evenly-spaced y vals from ymin to ymax
+
+        $.each(data, function (index, obj) {
+
+            if (index == 'patient_data') {
+                input_values = (data.patient_data).split(',');
+                zvaluesPatient = (data.patient_data).split(',');
+            }
+          
+            for (j = 0; j < input_values.length - 1; j++) {
+                input_values[j] = parseFloat(input_values[j]);
+            }
+
+            // Structured (n * m) grid of data. Point coordinates are (xgrid, ygrid)
+            var n = 201, m = 201;
+            var nverts = n * m;
+
+            for (var j = 0., k = 0; j < m; ++j) {
+                for (var i = 0.; i < n; ++i, ++k) {
+                    xgrid[k] = xDomain[j]; // pick up the x,y points from the domain arrays
+                    ygrid[k] = yDomain[i];
+                    if (input_values[k] == 0) {
+                        values[k] = input_values[k];
+                    }
+                    else {
+                        values[k] = input_values[k];
+                    }
+                }
+            }
+
+            // Obtain centre of grid etc.
+            xmin = d3.min(xgrid);
+            xmax = d3.max(xgrid);
+            xmid = 0.5 * (xmin + xmax);
+            var xrange = xmax - xmin;
+
+            ymin = d3.min(ygrid);
+            ymax = d3.max(ygrid);
+            ymid = 0.5 * (ymin + ymax);
+            var yrange = ymax - ymin;
+
+            zmin = d3.min(values);
+            zmax = d3.max(values);
+            zmid = 0.5 * (zmin + zmax);
+            var zrange = zmax - zmin;
+
+            //console.log("Surface");
+            //console.log("xmid:" + xmid + "  ymid:" + ymid + "  zmid:" + zmid);
+
+            // Use d3 for color scale
+            var color = d3.scaleLinear()
+                .domain(d3.extent(values))
+                .interpolate(function () { return d3.interpolateSpectral; });
+
+            // Initialise threejs geometry
+            var hov_geometry = new THREE.Geometry();
+
+            // Add grid vertices to geometry and center with xmid,ymid
+            for (var k = 0; k < nverts; ++k) {
+                //console.log(xgrid[k] + ", " + ygrid[k] + ", " + values[k]);
+                var newvert = new THREE.Vector3((xgrid[k] - xmid), (ygrid[k] - ymid), (values[k]));
+                hov_geometry.vertices.push(newvert);
+            }
+
+            // Add cell faces (2 triangles per cell) to geometry
+            for (var j = 0; j < m - 1; j++) {
+                for (var i = 0; i < n - 1; i++) {
+                    var n0 = j * n + i;
+                    var n1 = n0 + 1;
+                    var n2 = (j + 1) * n + i + 1;
+                    var n3 = n2 - 1;
+                    face1 = new THREE.Face3(n0, n1, n2);
+                    face2 = new THREE.Face3(n2, n3, n0);
+                    face1.vertexColors[0] = new THREE.Color(color(values[n0]));
+                    face1.vertexColors[1] = new THREE.Color(color(values[n1]));
+                    face1.vertexColors[2] = new THREE.Color(color(values[n2]));
+                    face2.vertexColors[0] = new THREE.Color(color(values[n2]));
+                    face2.vertexColors[1] = new THREE.Color(color(values[n3]));
+                    face2.vertexColors[2] = new THREE.Color(color(values[n0]));
+                    hov_geometry.faces.push(face1);
+                    hov_geometry.faces.push(face2);
+                }
+            }
+
+            // Compute normals for shading
+            hov_geometry.computeFaceNormals();
+            hov_geometry.computeVertexNormals();
+                       
+            // Use MeshPhongMaterial for a reflective surface
+            hov_phong_material = new THREE.MeshPhongMaterial({
+                side: THREE.DoubleSide,
+                color: 0xffffff,
+                vertexColors: THREE.VertexColors,
+                specular: 0x050505,
+                shininess: 100.,
+                emissive: 0x111111,
+                //clipping plane
+                clippingPlanes: [local_plane]
+                //wireframe: true
+            });
+
+            // Lambert material
+            hov_lambert_material = new THREE.MeshLambertMaterial({
+                side: THREE.DoubleSide,
+                color: 0xffffff,
+                vertexColors: THREE.VertexColors,
+                // *** clipping plane
+                clippingPlanes: [local_plane],
+                //wireframe: true
+            });
+
+            //default material
+            hov_material = hov_lambert_material;
+            hov_material.transparent = true;
+            hov_material.opacity = 0.30;
+
+            // build surface object
+            var hov_surface = new THREE.Mesh(hov_geometry, hov_material);
+
+           hov_surface.rotateZ(Math.PI / 2.0);
+
+            // name it so we can remove it if we want
+            if (index == 'patient_data') {
+                hov_surface.name = 'patient';
+            }
+            hov_surfaces.push(hov_surface);
+      
+            //hov_surface.visible = false;
+
+            parent.add(hov_surface);
+           
+   
+        }); 
+
+
+    }   // end buildSurfaces
+
+
+    // build splines
+    function buildSplines() {
+        ucurves = new Array();
+        var spline = new Array();
+
+        for (var j = 0., k = 0; j < m; ++j) {
+            for (var i = 0.; i < n; ++i, ++k) {
+                xgrid[k] = i;
+                ygrid[k] = j;
+                values[k] = zvaluesPatient[k];
+                spline.push(new THREE.Vector3(xgrid[k]-xmid, ygrid[k]-ymid, values[k]-zmid));
+            }
+            var curve = new THREE.CatmullRomCurve3(spline);
+            ucurves.push(curve);
+            var points = curve.getPoints(200);
+            var geometry = new THREE.BufferGeometry().setFromPoints(points);
+            var material = new THREE.LineBasicMaterial({ color: 0xff00ff });
+            var curveObject = new THREE.Line(geometry, material);
+            // uncomment this to display the splines
+            scene.add(curveObject);
+            // reset the spline
+            spline = new Array();
+        }
+    }  // end buildSplines
+
+    // creat grid
+    function createAGrid(opts) {
+          var config = opts || {
+            height: (ymax - ymin) / 2.0,
+            width: (xmax - xmin) / 2.0,
+            linesHeight: 1,
+            linesWidth: 1,
+            color: 0x00ff00
+          };
+
+          var material = new THREE.LineBasicMaterial({
+            color: config.color,
+            opacity: 1.0
+          });
+
+          var gridObject = new THREE.Object3D(),
+            gridGeo = new THREE.Geometry(),
+            stepw = 2 * config.width / config.linesWidth,
+            steph = 2 * config.height / config.linesHeight;
+
+          //width
+          for (var i = -config.width; i <= config.width; i += stepw) {
+            gridGeo.vertices.push(new THREE.Vector3(-config.height, i, 0));
+            gridGeo.vertices.push(new THREE.Vector3(config.height, i, 0));
+
+          }
+          //height
+          for (var i = -config.height; i <= config.height; i += steph) {
+            gridGeo.vertices.push(new THREE.Vector3(i, -config.width, 0));
+            gridGeo.vertices.push(new THREE.Vector3(i, config.width, 0));
+          }
+        
+          console.log(gridGeo.vertices);
+          var line = new THREE.LineSegments(gridGeo, material);
+          gridObject.add(line);
+                    
+          parent.add(gridObject);
+        }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        $.each(hov_surfaces, function (index, obj) {
+            if (this.visible && rotate_flag)  {
+                this.rotation.z += 0.005;
+                axesHelper.rotation.z += 0.005;
+            }
+        });
+
+        render();
+
+    }
+
+
+    function render() {
+        renderer.render(scene, camera);
+
+    }
+
+       
+    function pt3(x, y, z) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+    }
+      
+       
+</script>
+
+
+
+
